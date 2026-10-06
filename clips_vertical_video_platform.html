@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-black text-white selection:bg-rose-500 selection:text-white">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clips - Short Vertical Videos</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Phosphor Icons CDN for modern UI icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              500: '#FF2A54',
+              600: '#E01E43',
+            }
+          },
+          animation: {
+            'heart-pop': 'heartPop 0.8s cubic-bezier(0.17, 0.89, 0.32, 1.49) forwards',
+            'disc-spin': 'spin 4s linear infinite',
+          },
+          keyframes: {
+            heartPop: {
+              '0%': { transform: 'scale(0) rotate(-15deg)', opacity: '0' },
+              '50%': { transform: 'scale(1.3) rotate(0deg)', opacity: '1' },
+              '100%': { transform: 'scale(1) rotate(10deg)', opacity: '0' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Hide scrollbars for clean full-screen video feel */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Snap scroll container settings */
+    .snap-y-mandatory {
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+    }
+    .snap-start-card {
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+
+    /* Gradient overlay for text legibility over videos */
+    .video-overlay-gradient {
+      background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%);
+    }
+    
+    .top-overlay-gradient {
+      background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+    }
+  </style>
+</head>
+<body class="h-full overflow-hidden bg-slate-950 font-sans antialiased flex justify-center items-center">
+
+  <!-- App Frame (Constrained on desktop for realistic app layout, full screen on mobile) -->
+  <div id="app" class="relative w-full h-full sm:max-w-md sm:h-[92vh] sm:rounded-3xl overflow-hidden shadow-2xl bg-black border border-neutral-800 flex flex-col">
+
+    <!-- Top Navigation Overlay -->
+    <header class="absolute top-0 left-0 right-0 z-30 px-4 py-3 flex items-center justify-between top-overlay-gradient pointer-events-none">
+      
+      <!-- Brand Logo Area -->
+      <div class="flex items-center gap-2 pointer-events-auto cursor-pointer" onclick="scrollToTop()">
+        <div id="logoContainer" class="relative flex items-center justify-center">
+          <img id="customLogo" src="https://i.imgur.com/0KuDBiH.png" alt="Clips Logo" class="w-8 h-8 rounded-xl object-cover shadow-lg border border-white/20">
+        </div>
+        <span class="font-extrabold text-xl tracking-tight text-white drop-shadow-md">Clips</span>
+      </div>
+
+      <!-- Feed Navigation Tabs -->
+      <nav class="flex items-center gap-4 text-sm font-semibold pointer-events-auto">
+        <button id="tabForYou" onclick="switchTab('foryou')" class="text-white border-b-2 border-brand-500 pb-0.5 transition-all">For You</button>
+        <button id="tabSaved" onclick="switchTab('saved')" class="text-neutral-400 hover:text-white pb-0.5 transition-all">Saved</button>
+      </nav>
+
+      <!-- Top Action Buttons -->
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button onclick="toggleMuteAll()" id="globalMuteBtn" class="p-2 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/10 hover:bg-black/60 transition">
+          <i class="ph-bold ph-speaker-high text-lg" id="globalMuteIcon"></i>
+        </button>
+        <button onclick="openUploadModal()" class="p-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white shadow-lg transition">
+          <i class="ph-bold ph-plus text-lg"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Video Feed Container -->
+    <main id="feedContainer" class="flex-1 w-full h-full snap-y-mandatory overflow-y-scroll no-scrollbar relative">
+      <!-- Dynamic Video Cards loaded real-time from Firestore -->
+    </main>
+
+    <!-- Mobile Bottom Toolbar -->
+    <footer class="h-14 bg-black/95 backdrop-blur-md border-t border-neutral-800/80 flex items-center justify-around z-30 px-2">
+      <button onclick="switchTab('foryou')" class="flex flex-col items-center text-rose-500 gap-0.5">
+        <i class="ph-fill ph-house text-xl"></i>
+        <span class="text-[10px] font-medium">Home</span>
+      </button>
+      <button onclick="openSearchModal()" class="flex flex-col items-center text-neutral-400 hover:text-white gap-0.5">
+        <i class="ph-bold ph-magnifying-glass text-xl"></i>
+        <span class="text-[10px] font-medium">Discover</span>
+      </button>
+      <button onclick="openUploadModal()" class="flex flex-col items-center">
+        <div class="w-10 h-7 bg-gradient-to-r from-cyan-400 via-rose-500 to-yellow-400 p-[2px] rounded-lg shadow-md hover:scale-105 transition">
+          <div class="w-full h-full bg-black rounded-[6px] flex items-center justify-center">
+            <i class="ph-bold ph-plus text-white text-sm"></i>
+          </div>
+        </div>
+      </button>
+      <button onclick="switchTab('saved')" class="flex flex-col items-center text-neutral-400 hover:text-white gap-0.5">
+        <i class="ph-bold ph-bookmark text-xl"></i>
+        <span class="text-[10px] font-medium">Saved</span>
+      </button>
+      <button onclick="openKeyboardHelp()" class="flex flex-col items-center text-neutral-400 hover:text-white gap-0.5">
+        <i class="ph-bold ph-keyboard text-xl"></i>
+        <span class="text-[10px] font-medium">Shortcuts</span>
+      </button>
+    </footer>
+
+    <!-- MODAL 1: Upload / Add Video Modal -->
+    <div id="uploadModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border border-neutral-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
+          <h3 class="font-bold text-lg text-white flex items-center gap-2">
+            <i class="ph-bold ph-upload-simple text-brand-500"></i> Add New Clip
+          </h3>
+          <button onclick="closeUploadModal()" class="text-neutral-400 hover:text-white text-xl">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+
+        <!-- Upload Mode Toggle -->
+        <div class="flex rounded-xl bg-neutral-800 p-1 text-xs">
+          <button type="button" id="uploadModeFileBtn" onclick="setUploadMode('file')" class="flex-1 py-1.5 rounded-lg font-semibold bg-brand-500 text-white transition">Direct File</button>
+          <button type="button" id="uploadModeUrlBtn" onclick="setUploadMode('url')" class="flex-1 py-1.5 rounded-lg font-semibold text-neutral-400 hover:text-white transition">Catbox Link</button>
+        </div>
+
+        <form id="uploadForm" onsubmit="handleVideoAdd(event)" class="space-y-3">
+          <!-- Option A: Direct Local MP4 File Upload -->
+          <div id="fileUploadContainer">
+            <label class="text-xs font-semibold text-neutral-400 block mb-1">Select Vertical MP4 File</label>
+            <input type="file" id="clipFile" accept="video/mp4,video/webm" class="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2 text-xs text-neutral-300 focus:outline-none focus:border-brand-500">
+            <p class="text-[10px] text-neutral-500 mt-1">Uploads automatically to Catbox.moe anonymously.</p>
+          </div>
+
+          <!-- Option B: Direct Catbox URL Input -->
+          <div id="urlUploadContainer" class="hidden">
+            <label class="text-xs font-semibold text-neutral-400 block mb-1">Direct Catbox.moe MP4 Link</label>
+            <input type="url" id="clipUrl" placeholder="https://files.catbox.moe/example.mp4" class="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-brand-500">
+            <p class="text-[10px] text-neutral-500 mt-1">Tip: Upload your video on <a href="https://catbox.moe" target="_blank" class="text-brand-500 underline">catbox.moe</a> and paste link here.</p>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-neutral-400 block mb-1">Title / Caption</label>
+            <input type="text" id="clipTitle" required placeholder="Check out this clip! #viral" class="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-brand-500">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-semibold text-neutral-400 block mb-1">Creator Name</label>
+              <input type="text" id="clipAuthor" placeholder="@username" class="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-neutral-400 block mb-1">Sound Name</label>
+              <input type="text" id="clipSound" placeholder="Original Audio" class="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+
+          <button type="submit" id="submitClipBtn" class="w-full bg-brand-500 hover:bg-brand-600 font-semibold text-white py-2.5 rounded-xl transition shadow-lg mt-2 flex items-center justify-center gap-2 text-sm">
+            <i class="ph-bold ph-plus-circle text-base"></i> Post Clip
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL 2: Comments Drawer -->
+    <div id="commentsDrawer" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end">
+      <div class="bg-neutral-900 border-t border-neutral-800 w-full max-w-md mx-auto h-[60%] rounded-t-3xl p-4 flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
+          <span class="font-bold text-sm text-white flex items-center gap-1.5">
+            <i class="ph-bold ph-chat-circle text-brand-500"></i> Comments (<span id="commentCountHeader">0</span>)
+          </span>
+          <button onclick="closeComments()" class="text-neutral-400 hover:text-white p-1">
+            <i class="ph-bold ph-x text-lg"></i>
+          </button>
+        </div>
+
+        <div id="commentsList" class="flex-1 overflow-y-auto my-3 space-y-3 no-scrollbar pr-1">
+          <!-- Comments render here -->
+        </div>
+
+        <form onsubmit="postComment(event)" class="flex gap-2 pt-2 border-t border-neutral-800">
+          <input type="text" id="commentInput" required placeholder="Add a comment..." class="flex-1 bg-neutral-800 border border-neutral-700 rounded-full px-4 py-2 text-xs text-white focus:outline-none focus:border-brand-500">
+          <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white rounded-full px-4 text-xs font-semibold transition">
+            Post
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL 3: Share Dialog -->
+    <div id="shareModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border border-neutral-800 w-full max-w-xs rounded-2xl p-5 text-center shadow-2xl">
+        <div class="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-full flex items-center justify-center mx-auto mb-3">
+          <i class="ph-bold ph-share-network text-2xl"></i>
+        </div>
+        <h4 class="font-bold text-white text-base mb-1">Share Clip</h4>
+        <p class="text-xs text-neutral-400 mb-4">Copy direct link or embed code to share with friends.</p>
+        
+        <input type="text" id="shareUrlInput" readonly class="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-neutral-300 mb-3 text-center focus:outline-none">
+
+        <div class="flex gap-2">
+          <button onclick="copyShareUrl()" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 rounded-xl text-xs transition">
+            Copy Link
+          </button>
+          <button onclick="closeShareModal()" class="flex-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold py-2 rounded-xl text-xs transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: Keyboard Shortcuts Info -->
+    <div id="keyboardModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-neutral-900 border border-neutral-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl">
+        <div class="flex justify-between items-center mb-3 border-b border-neutral-800 pb-2">
+          <h4 class="font-bold text-white text-sm">Keyboard Shortcuts</h4>
+          <button onclick="closeKeyboardHelp()" class="text-neutral-400 hover:text-white"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <ul class="text-xs space-y-2 text-neutral-300">
+          <li class="flex justify-between"><span class="bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700 font-mono">↑ / ↓</span> Next/Prev Clip</li>
+          <li class="flex justify-between"><span class="bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700 font-mono">Space</span> Play / Pause</li>
+          <li class="flex justify-between"><span class="bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700 font-mono">M</span> Toggle Mute</li>
+          <li class="flex justify-between"><span class="bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700 font-mono">L</span> Like Clip</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 border border-neutral-700 text-white px-4 py-2 rounded-full text-xs shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
+      <i class="ph-bold ph-check-circle text-emerald-400 text-sm"></i>
+      <span id="toastMsg">Notification</span>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, addDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Your exact Firebase configuration
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "AIzaSyDrfQFgsjcF5fcytvbh11YHxnJy43ReSIE",
+      authDomain: "clips-3d004.firebaseapp.com",
+      projectId: "clips-3d004",
+      storageBucket: "clips-3d004.firebasestorage.app",
+      messagingSenderId: "549073241160",
+      appId: "1:549073241160:web:00910337ed1ea82513047d",
+      measurementId: "G-G7SY6Q8NLX"
+    };
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'clips-app';
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Make database instances available globally for UI functions
+    window.clipsDb = db;
+    window.clipsAuth = auth;
+    window.clipsAppId = appId;
+
+    // App State Management
+    window.clips = [];
+    window.activeTab = 'foryou';
+    window.isGlobalMuted = true;
+    window.currentClipIdForComments = null;
+    window.observer = null;
+    window.lastTapTime = 0;
+    window.uploadMode = 'file';
+
+    // Initialize Auth and Real-time Database Listener
+    window.addEventListener('DOMContentLoaded', async () => {
+      setupIntersectionObserver();
+      setupKeyboardControls();
+
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) {
+        console.warn("Auth initialisation fallback:", e);
+      }
+
+      // Firestore Public Collection path
+      const clipsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clips');
+
+      // Real-time listener for public clip updates
+      onSnapshot(clipsRef, (snapshot) => {
+        const loadedClips = [];
+        snapshot.forEach(docSnap => {
+          loadedClips.push({ id: docSnap.id, ...docSnap.data() });
+        });
+
+        // Sort latest clips first
+        loadedClips.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        window.clips = loadedClips;
+        renderFeed();
+      }, (err) => {
+        console.error("Firestore listener error:", err);
+      });
+    });
+
+    function setupIntersectionObserver() {
+      const options = {
+        root: document.getElementById('feedContainer'),
+        threshold: 0.65
+      };
+
+      window.observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const video = entry.target.querySelector('video');
+          if (!video) return;
+
+          if (entry.isIntersecting) {
+            video.muted = window.isGlobalMuted;
+            video.play().catch(err => console.log('Autoplay waiting for interaction'));
+            updateMuteButtonIcon();
+          } else {
+            video.pause();
+            video.currentTime = 0;
+          }
+        });
+      }, options);
+    }
+
+    window.renderFeed = function() {
+      const feed = document.getElementById('feedContainer');
+      feed.innerHTML = '';
+
+      const filteredClips = window.activeTab === 'saved' ? window.clips.filter(c => c.saved) : window.clips;
+
+      if (filteredClips.length === 0) {
+        feed.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-center p-6 text-neutral-400">
+            <i class="ph-bold ph-film-strip text-5xl mb-3 text-neutral-600"></i>
+            <p class="font-bold text-base text-white">No clips in feed yet!</p>
+            <p class="text-xs text-neutral-400 mt-1 max-w-xs">Click <span class="text-brand-500 font-semibold">(+) Post Clip</span> to upload your first vertical video.</p>
+          </div>
+        `;
+        return;
+      }
+
+      filteredClips.forEach(clip => {
+        const card = document.createElement('div');
+        card.className = 'snap-start-card relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none';
+        card.dataset.id = clip.id;
+
+        card.innerHTML = `
+          <video 
+            src="${clip.url}" 
+            class="w-full h-full object-cover cursor-pointer"
+            loop 
+            playsinline 
+            onclick="handleVideoClick(event, '${clip.id}')"
+          ></video>
+
+          <div class="play-state-icon absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200">
+            <div class="p-4 bg-black/50 rounded-full text-white backdrop-blur-sm">
+              <i class="ph-fill ph-play text-3xl"></i>
+            </div>
+          </div>
+
+          <div class="heart-animation-container absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+          <div class="absolute inset-0 video-overlay-gradient pointer-events-none"></div>
+
+          <div class="absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4">
+            <div class="relative mb-1">
+              <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-500 to-yellow-400 p-[2px] shadow-lg">
+                <div class="w-full h-full bg-neutral-800 rounded-full flex items-center justify-center font-bold text-xs text-white uppercase">
+                  ${(clip.author || '@c').substring(1, 3)}
+                </div>
+              </div>
+            </div>
+
+            <button onclick="toggleLike('${clip.id}')" class="flex flex-col items-center text-white group">
+              <div class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-active:scale-125 transition">
+                <i class="${clip.liked ? 'ph-fill ph-heart text-brand-500' : 'ph-bold ph-heart text-white'} text-xl"></i>
+              </div>
+              <span class="text-[11px] font-medium mt-1 drop-shadow">${clip.likes || 0}</span>
+            </button>
+
+            <button onclick="openComments('${clip.id}')" class="flex flex-col items-center text-white group">
+              <div class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-active:scale-125 transition">
+                <i class="ph-bold ph-chat-circle text-xl"></i>
+              </div>
+              <span class="text-[11px] font-medium mt-1 drop-shadow">${clip.comments ? clip.comments.length : 0}</span>
+            </button>
+
+            <button onclick="toggleSave('${clip.id}')" class="flex flex-col items-center text-white group">
+              <div class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-active:scale-125 transition">
+                <i class="${clip.saved ? 'ph-fill ph-bookmark text-yellow-400' : 'ph-bold ph-bookmark text-white'} text-xl"></i>
+              </div>
+              <span class="text-[11px] font-medium mt-1 drop-shadow">${clip.saved ? 'Saved' : 'Save'}</span>
+            </button>
+
+            <button onclick="openShareModal('${clip.id}')" class="flex flex-col items-center text-white group">
+              <div class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-active:scale-125 transition">
+                <i class="ph-bold ph-share-network text-xl"></i>
+              </div>
+              <span class="text-[11px] font-medium mt-1 drop-shadow">Share</span>
+            </button>
+
+            <div class="w-9 h-9 rounded-full bg-neutral-900 border-2 border-neutral-700 flex items-center justify-center animate-disc-spin shadow-xl">
+              <i class="ph-fill ph-music-notes text-xs text-brand-500"></i>
+            </div>
+          </div>
+
+          <div class="absolute left-3 right-16 bottom-6 z-20 text-white space-y-1.5">
+            <div class="font-bold text-sm tracking-wide flex items-center gap-1.5">
+              <span>${escapeHtml(clip.author || '@creator')}</span>
+            </div>
+            <p class="text-xs leading-relaxed text-neutral-200 line-clamp-2">${escapeHtml(clip.title)}</p>
+            <div class="flex items-center gap-2 text-[11px] text-neutral-300">
+              <i class="ph-bold ph-note text-xs"></i>
+              <span class="truncate max-w-[200px]">${escapeHtml(clip.sound || 'Original Sound')}</span>
+            </div>
+          </div>
+        `;
+
+        feed.appendChild(card);
+        window.observer.observe(card);
+      });
+    };
+
+    window.handleVideoClick = function(e, clipId) {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - window.lastTapTime;
+      const video = e.target;
+      const card = video.closest('.snap-start-card');
+
+      if (tapLength < 300 && tapLength > 0) {
+        triggerHeartAnimation(card, e.clientX, e.clientY);
+        toggleLike(clipId);
+      } else {
+        if (video.paused) {
+          video.play();
+          showPlayStateIcon(card, 'pause');
+        } else {
+          video.pause();
+          showPlayStateIcon(card, 'play');
+        }
+      }
+      window.lastTapTime = currentTime;
+    };
+
+    function showPlayStateIcon(card, state) {
+      const iconContainer = card.querySelector('.play-state-icon');
+      if (!iconContainer) return;
+      iconContainer.querySelector('i').className = state === 'play' ? 'ph-fill ph-play text-3xl' : 'ph-fill ph-pause text-3xl';
+      iconContainer.classList.remove('opacity-0');
+      setTimeout(() => iconContainer.classList.add('opacity-0'), 500);
+    }
+
+    function triggerHeartAnimation(card, x, y) {
+      const container = card.querySelector('.heart-animation-container');
+      if (!container) return;
+
+      const heart = document.createElement('div');
+      heart.className = 'absolute text-rose-500 text-6xl animate-heart-pop pointer-events-none drop-shadow-lg';
+      heart.innerHTML = '<i class="ph-fill ph-heart"></i>';
+      
+      const rect = card.getBoundingClientRect();
+      heart.style.left = `${x - rect.left - 30}px`;
+      heart.style.top = `${y - rect.top - 30}px`;
+
+      container.appendChild(heart);
+      setTimeout(() => heart.remove(), 800);
+    }
+
+    window.setUploadMode = function(mode) {
+      window.uploadMode = mode;
+      const fileContainer = document.getElementById('fileUploadContainer');
+      const urlContainer = document.getElementById('urlUploadContainer');
+      const fileBtn = document.getElementById('uploadModeFileBtn');
+      const urlBtn = document.getElementById('uploadModeUrlBtn');
+
+      if (mode === 'file') {
+        fileContainer.classList.remove('hidden');
+        urlContainer.classList.add('hidden');
+        fileBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold bg-brand-500 text-white transition';
+        urlBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold text-neutral-400 hover:text-white transition';
+      } else {
+        fileContainer.classList.add('hidden');
+        urlContainer.classList.remove('hidden');
+        urlBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold bg-brand-500 text-white transition';
+        fileBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold text-neutral-400 hover:text-white transition';
+      }
+    };
+
+    window.handleVideoAdd = async function(e) {
+      e.preventDefault();
+      const title = document.getElementById('clipTitle').value.trim();
+      const author = document.getElementById('clipAuthor').value.trim() || '@creator';
+      const sound = document.getElementById('clipSound').value.trim() || 'Original Sound';
+      const submitBtn = document.getElementById('submitClipBtn');
+
+      let finalVideoUrl = '';
+
+      submitBtn.disabled = true;
+
+      if (window.uploadMode === 'file') {
+        const fileInput = document.getElementById('clipFile');
+        if (!fileInput.files || fileInput.files.length === 0) {
+          showToast('Please select an MP4 file.');
+          submitBtn.disabled = false;
+          return;
+        }
+
+        const file = fileInput.files[0];
+        submitBtn.innerText = 'Uploading video...';
+
+        try {
+          const formData = new FormData();
+          formData.append('reqtype', 'fileupload');
+          formData.append('fileToUpload', file);
+
+          // Route through corsproxy.io to bypass browser CORS restrictions on catbox.moe
+          const targetUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php');
+          const res = await fetch(targetUrl, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!res.ok) throw new Error('Proxy upload request failed');
+          const uploadedUrl = await res.text();
+          if (uploadedUrl.startsWith('http')) {
+            finalVideoUrl = uploadedUrl.trim();
+          } else {
+            throw new Error('Invalid URL returned from server');
+          }
+        } catch (err) {
+          console.warn("Catbox CORS proxy failed, falling back to local Blob URL:", err);
+          // Fall back to creating a local blob URL so the user can play their video immediately
+          finalVideoUrl = URL.createObjectURL(file);
+          showToast('Uploaded locally as video preview!');
+        }
+      } else {
+        finalVideoUrl = document.getElementById('clipUrl').value.trim();
+        if (!finalVideoUrl) {
+          showToast('Please enter a valid Catbox MP4 link.');
+          submitBtn.disabled = false;
+          return;
+        }
+      }
+
+      submitBtn.innerText = 'Posting to database...';
+
+      try {
+        const newClipData = {
+          url: finalVideoUrl,
+          title: title,
+          author: author.startsWith('@') ? author : '@' + author,
+          sound: sound,
+          likes: 0,
+          liked: false,
+          saved: false,
+          comments: [],
+          createdAt: Date.now()
+        };
+
+        const clipsRef = collection(window.clipsDb, 'artifacts', window.clipsAppId, 'public', 'data', 'clips');
+        await addDoc(clipsRef, newClipData);
+
+        closeUploadModal();
+        switchTab('foryou');
+        showToast('New Clip Posted Live!');
+        document.getElementById('uploadForm').reset();
+      } catch (err) {
+        console.error("Error adding clip to Firestore:", err);
+        showToast("Error saving clip to cloud database.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="ph-bold ph-plus-circle text-base"></i> Post Clip';
+      }
+    };
+
+    window.toggleLike = async function(clipId) {
+      const clip = window.clips.find(c => c.id === clipId);
+      if (!clip) return;
+
+      const newLiked = !clip.liked;
+      const newLikes = (clip.likes || 0) + (newLiked ? 1 : -1);
+
+      clip.liked = newLiked;
+      clip.likes = Math.max(0, newLikes);
+      renderFeed();
+
+      try {
+        const clipRef = doc(window.clipsDb, 'artifacts', window.clipsAppId, 'public', 'data', 'clips', clipId);
+        await updateDoc(clipRef, { likes: Math.max(0, newLikes), liked: newLiked });
+      } catch (err) {
+        console.error("Error updating likes:", err);
+      }
+    };
+
+    window.toggleSave = function(clipId) {
+      const clip = window.clips.find(c => c.id === clipId);
+      if (!clip) return;
+
+      clip.saved = !clip.saved;
+      showToast(clip.saved ? 'Saved to collection' : 'Removed from saved');
+      renderFeed();
+    };
+
+    window.openComments = function(clipId) {
+      window.currentClipIdForComments = clipId;
+      const clip = window.clips.find(c => c.id === clipId);
+      if (!clip) return;
+
+      document.getElementById('commentCountHeader').textContent = clip.comments ? clip.comments.length : 0;
+      renderCommentsList(clip);
+      document.getElementById('commentsDrawer').classList.remove('hidden');
+    };
+
+    window.closeComments = function() {
+      document.getElementById('commentsDrawer').classList.add('hidden');
+      window.currentClipIdForComments = null;
+    };
+
+    function renderCommentsList(clip) {
+      const container = document.getElementById('commentsList');
+      container.innerHTML = '';
+
+      if (!clip.comments || clip.comments.length === 0) {
+        container.innerHTML = '<p class="text-xs text-neutral-500 text-center py-6">Be the first to comment!</p>';
+        return;
+      }
+
+      clip.comments.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'flex items-start gap-2 text-xs text-white';
+        item.innerHTML = `
+          <div class="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-[10px] text-neutral-300">
+            ${escapeHtml(c.author).substring(1, 2).toUpperCase()}
+          </div>
+          <div>
+            <span class="font-bold text-neutral-300 mr-1.5">${escapeHtml(c.author)}:</span>
+            <span class="text-neutral-200">${escapeHtml(c.text)}</span>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    window.postComment = async function(e) {
+      e.preventDefault();
+      if (!window.currentClipIdForComments) return;
+      
+      const input = document.getElementById('commentInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const clip = window.clips.find(c => c.id === window.currentClipIdForComments);
+      if (clip) {
+        const updatedComments = clip.comments ? [...clip.comments, { author: '@you', text: text }] : [{ author: '@you', text: text }];
+        clip.comments = updatedComments;
+        renderCommentsList(clip);
+
+        try {
+          const clipRef = doc(window.clipsDb, 'artifacts', window.clipsAppId, 'public', 'data', 'clips', clip.id);
+          await updateDoc(clipRef, { comments: updatedComments });
+        } catch (err) {
+          console.error("Error saving comment:", err);
+        }
+      }
+      input.value = '';
+    };
+
+    window.switchTab = function(tab) {
+      window.activeTab = tab;
+      document.getElementById('tabForYou').className = tab === 'foryou' 
+        ? 'text-white border-b-2 border-brand-500 pb-0.5 transition-all' 
+        : 'text-neutral-400 hover:text-white pb-0.5 transition-all';
+      
+      document.getElementById('tabSaved').className = tab === 'saved' 
+        ? 'text-white border-b-2 border-brand-500 pb-0.5 transition-all' 
+        : 'text-neutral-400 hover:text-white pb-0.5 transition-all';
+
+      renderFeed();
+    };
+
+    window.toggleMuteAll = function() {
+      window.isGlobalMuted = !window.isGlobalMuted;
+      document.querySelectorAll('video').forEach(v => v.muted = window.isGlobalMuted);
+      updateMuteButtonIcon();
+      showToast(window.isGlobalMuted ? 'Muted' : 'Unmuted');
+    };
+
+    function updateMuteButtonIcon() {
+      const icon = document.getElementById('globalMuteIcon');
+      if (icon) {
+        icon.className = window.isGlobalMuted ? 'ph-bold ph-speaker-slash text-lg text-rose-400' : 'ph-bold ph-speaker-high text-lg text-white';
+      }
+    }
+
+    window.openShareModal = function(clipId) {
+      const clip = window.clips.find(c => c.id === clipId);
+      if (!clip) return;
+
+      document.getElementById('shareUrlInput').value = clip.url;
+      document.getElementById('shareModal').classList.remove('hidden');
+    };
+
+    window.closeShareModal = function() {
+      document.getElementById('shareModal').classList.add('hidden');
+    };
+
+    window.copyShareUrl = function() {
+      const shareInput = document.getElementById('shareUrlInput');
+      shareInput.select();
+      try {
+        document.execCommand('copy');
+        showToast('Link copied to clipboard!');
+      } catch (err) {
+        showToast('Selected link - press Ctrl+C to copy');
+      }
+      closeShareModal();
+    };
+
+    function setupKeyboardControls() {
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+        const container = document.getElementById('feedContainer');
+        const cards = Array.from(document.querySelectorAll('.snap-start-card'));
+        if (cards.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          container.scrollBy({ top: container.clientHeight, behavior: 'smooth' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          container.scrollBy({ top: -container.clientHeight, behavior: 'smooth' });
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          const visibleCard = cards.find(card => {
+            const rect = card.getBoundingClientRect();
+            return rect.top >= -50 && rect.top <= 100;
+          });
+          if (visibleCard) {
+            const video = visibleCard.querySelector('video');
+            if (video) video.paused ? video.play() : video.pause();
+          }
+        } else if (e.key.toLowerCase() === 'm') {
+          toggleMuteAll();
+        }
+      });
+    }
+
+    window.openUploadModal = function() { document.getElementById('uploadModal').classList.remove('hidden'); };
+    window.closeUploadModal = function() { document.getElementById('uploadModal').classList.add('hidden'); };
+    window.openKeyboardHelp = function() { document.getElementById('keyboardModal').classList.remove('hidden'); };
+    window.closeKeyboardHelp = function() { document.getElementById('keyboardModal').classList.add('hidden'); };
+    window.openSearchModal = function() { showToast('Use top tabs to filter feed'); };
+    window.scrollToTop = function() { document.getElementById('feedContainer').scrollTo({ top: 0, behavior: 'smooth' }); };
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = message;
+      toast.classList.remove('opacity-0');
+      setTimeout(() => toast.classList.add('opacity-0'), 2500);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+  </script>
+</body>
+</html>
